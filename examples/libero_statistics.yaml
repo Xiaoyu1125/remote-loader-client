@@ -1,0 +1,69 @@
+# Observed LIBERO schema: 20 Hz, float32 action [7], observation.state [8].
+# G05 statistics preparation: nine observation steps and 32 dropped tail anchors.
+# This is an independent full-data job, not a training batch/sampling YAML.
+statistics_format: {type: tensor_statistics, version: 1}
+scope:
+  dataset_indices: [0]
+  grouping: pooled
+scan:
+  drop_n_first_frames: 0
+  drop_n_last_frames: 32
+  stride: 1
+view:
+  batch_format: {type: canonical_sample, version: 2}
+  require_metadata: {fps: 20}
+  image_output: {enabled: false}
+  windows:
+    observation: {offsets: [0, 4, 8, 12, 16, 20, 24, 28, 32]}
+    action: {start: 0, step: 1, count: 32}
+  fields:
+    - target: [action]
+      source: {column: action}
+      window: action
+      tensor: {shape: [32, 7], dtype: float32}
+    - target: [proprio]
+      source: {column: observation.state}
+      window: observation
+      tensor: {shape: [9, 8], dtype: float32}
+    # temporal_mask True means valid; is_pad has the opposite polarity.
+    - target: [action_valid]
+      source:
+        temporal_mask: {fields: [[action]], reduction: equal}
+      tensor: {shape: [32], dtype: bool}
+    - target: [proprio_valid]
+      source:
+        temporal_mask: {fields: [[proprio]], reduction: equal}
+      tensor: {shape: [9], dtype: bool}
+statistics:
+  action:
+    field: [action]
+    mask: {field: [action_valid], axes: [0]}
+    reduce_axes: [sample]
+    non_finite: error
+    metrics:
+      count: {op: count}
+      min: {op: min}
+      max: {op: max}
+      mean: {op: mean}
+      std: {op: std, ddof: 1}
+      q01: {op: quantile, q: 0.01, method: lower}
+      q99: {op: quantile, q: 0.99, method: lower}
+  proprio:
+    field: [proprio]
+    mask: {field: [proprio_valid], axes: [0]}
+    reduce_axes: [sample]
+    non_finite: error
+    metrics:
+      q01:
+        op: quantile
+        q: 0.01
+        method: lower
+        post_reduce: {op: min, axes: [0]}
+      q99:
+        op: quantile
+        q: 0.99
+        method: lower
+        post_reduce: {op: max, axes: [0]}
+execution:
+  # Explicit statistics workspace budget; server also enforces its own cap.
+  max_memory_bytes: 2147483648

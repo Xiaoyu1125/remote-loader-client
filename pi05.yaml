@@ -1,0 +1,51 @@
+# PI0.5 LIBERO input projection.
+# Select the dataset in training settings; this file defines output fields and windows.
+# Training prerequisites:
+# - Matching q01/q99 quantile statistics are available for normalization.
+# - Training loss uses action_is_pad to exclude padding actions.
+# Validate these prerequisites before training.
+
+batch_format: {type: canonical_sample, version: 2}
+image_output:
+  enabled: true
+  resize_uint8: false
+  antialias: false
+  padding: [0, 0, 0, 0]
+  # Keep mean/std unset: output is float32 [0,1]; apply model-required scaling exactly once.
+require_metadata: {fps: 20}
+sampling:
+  shuffle_seed: 42
+  drop_n_first_frames: 0
+  drop_n_last_frames: 0
+
+windows:
+  action: {start: 0, step: 1, count: 50}
+
+fields:
+  # State and images are current-frame tensors without a leading time dimension.
+  - target: ["observation.state"]
+    source: {column: observation.state}
+    tensor: {shape: [8], dtype: float32}
+  - target: ["observation.images.image"]
+    source: {column: observation.images.image}
+    tensor: {shape: [3, 224, 224], dtype: float32}
+  - target: ["observation.images.wrist_image"]
+    source: {column: observation.images.wrist_image}
+    tensor: {shape: [3, 224, 224], dtype: float32}
+
+  - target: ["action"]
+    source: {column: action}
+    window: action
+    tensor: {shape: [50, 7], dtype: float32}
+  - target: ["action_is_pad"]
+    source:
+      is_pad:
+        fields: [["action"]]
+        reduction: equal
+    tensor: {shape: [50], dtype: bool}
+
+  - target: ["task"]
+    source:
+      index_column: task_index
+      lookup: {table: tasks, key_column: task_index, value_column: task}
+    value_type: string

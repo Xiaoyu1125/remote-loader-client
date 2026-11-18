@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modalink Client"
+  short_description: "安装配置 Modalink client，通过 scheduler 登记训练并读取 VLA sample 或 VQA batch"
+  default_prompt: "使用 $modalink-client，根据单独交付的 skill、YAML 和实际 Python 环境安装配置 client，设置 scheduler 和训练 ID，检查 BatchSpec 并按授权有限读取 VLA sample 或完整 VQA batch；区分字段诊断摘要与真实数据，按需协助私网接入、训练登记与释放、训练代码接入，不将 VLA 本地训练组批当作远端 batch。"

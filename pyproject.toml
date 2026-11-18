@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "modalink-remote-loader-client"
+version = "0.3.2"
+requires-python = ">=3.10"
+description = "Remote VLA sample and VQA batch transport with declarative YAML specifications"
+readme = "README.md"
+license = { text = "Proprietary" }
+authors = [{ name = "Modalink" }]
+dependencies = [
+  "httpx>=0.27,<1",
+  "pydantic>=2.7,<3",
+  "PyYAML>=6,<7",
+  "zlib-ng>=1.0,<2",
+]
+
+[project.optional-dependencies]
+interactive = ["questionary>=2,<3", "rich>=13.7,<15"]
+
+[project.scripts]
+remote-loader = "remote_loader.cli.main:main"
+
+[tool.hatch.build]
+exclude = [
+  "src/remote_loader/certs/**",
+  "**/certs/**",
+  "**/certificates/**",
+  "**/*.key",
+  "**/*.pem",
+  "**/*.crt",
+  "**/*.cer",
+  "**/*.der",
+  "**/*.p12",
+  "**/*.pfx",
+  "**/*.jks",
+  "**/*.keystore",
+  "**/.env",
+  "**/.env.*",
+  "**/.config/**",
+  "**/.aws/**",
+  "**/.ssh/**",
+  "**/id_rsa",
+  "**/id_dsa",
+  "**/id_ecdsa",
+  "**/id_ed25519",
+  "**/credentials",
+  "**/credentials.*",
+  "**/secrets/**",
+  "**/secrets.*",
+  "**/tokens/**",
+  "**/*.token",
+  "**/token.json",
+  "**/tokens.json",
+  "**/client.json",
+  "**/*.local.json",
+  "**/*.local.yaml",
+  "**/*.local.yml",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/remote_loader"]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+  "src/remote_loader",
+  "examples",
+  "skill/modalink-client",
+  "README.md",
+  "user-guide.md",
+  "LICENSE.modaloader",
+  "pyproject.toml",
+  "batch.yaml",
+  "g05.yaml",
+  "pi05.yaml",
+  ".gitignore",
+]
