@@ -4,12 +4,12 @@
 
 ## 离线声明
 
-源码示例 `examples/libero_statistics.yaml` 使用实际观察到的 LIBERO 数据结构（schema）：20 Hz、float32 类型且宽度为 7 的 `action`，以及宽度为 8 的 `state`。`action` 窗口包含偏移 0–31；`observation` 窗口为 `[0, 4, 8, 12, 16, 20, 24, 28, 32]`；每个 episode 不丢弃开头的 anchor，丢弃末尾 32 个 **anchor**，`stride` 为 1。该 G05 数据准备配置有意独立于训练 sample YAML。它显式声明 2147483648 bytes（2 GiB）的统计工作区预算。提交前应根据实际 `catalog` 核对这些声明。该示例不请求或解码图像字段。
+本文的 `statistics.yaml` 表示用户自行编写或通过私有渠道取得的统计输入文件，公开仓库和 wheel 均不提供该文件；调用时请替换为实际路径。统计声明独立于训练 sample YAML，提交前须根据实际 `catalog` 核对字段、窗口和预算。例如，对于 20 Hz、float32 类型且宽度为 7 的 `action`、宽度为 8 的 `state`，可以声明 `action` 窗口偏移 0–31、`observation` 窗口 `[0, 4, 8, 12, 16, 20, 24, 28, 32]`；每个 episode 不丢弃开头的 anchor，丢弃末尾 32 个 **anchor**，`stride` 为 1，并显式声明 2147483648 bytes（2 GiB）的统计工作区预算。这一参数说明不请求或解码图像字段，不代表所有数据集的实际 schema 或推荐配置。
 
 ```python
 from remote_loader import StatisticsSpec
 
-spec = StatisticsSpec.from_yaml("examples/libero_statistics.yaml")
+spec = StatisticsSpec.from_yaml("statistics.yaml")
 request = spec.to_request()
 print(spec.request_hash)
 # A Python mapping uses the same strict validation:
@@ -31,7 +31,7 @@ spec = StatisticsSpec.from_dict(request)
 - `quantile` 要求 `q` 是 `[0, 1]` 范围内的有限数值，并显式指定 `method: lower` 或 `method: linear`。两种方法都是精确算法：`lower` 选择排序后索引 `floor(q*(n-1))` 并保持整数精度；`linear` 在相邻顺序统计量之间插值。不提供隐式近似算法。
 - 任意统计指标都可以增加 `post_reduce: {op: min, axes: [0]}` 或 `op: max`。其中非空且唯一的轴指向**第一阶段统计结果**，不是原始单样本张量。
 
-LIBERO/G05 示例将 `action` 的 `count/min/max/mean/std/q01/q99` 按时间步保留为 `[32, 7]`，并通过 `ddof: 1` 显式使用样本标准差。`proprio` 的 q01/q99 先在九个 `observation` 时间步上计算为 `[9, 8]`，再沿时间轴分别执行 min/max，得到 `[8]`。`action` 和 `proprio` 有效性掩码的 `shape` 分别为 `[32]` 和 `[9]`。这是通用的两阶段包络，不是针对 state/action 的特殊实现开关。先计算 quantile 再执行 min/max，与先合并时间维再计算一次 quantile 并不等价；只有显式 post-reduction 才会移除 `observation` 时间轴。
+沿用上述参数说明，若将 `action` 的 `count/min/max/mean/std/q01/q99` 按时间步保留，结果为 `[32, 7]`；通过 `ddof: 1` 可显式使用样本标准差。若将 state 输出命名为 `proprio`，其 q01/q99 可先在九个 `observation` 时间步上计算为 `[9, 8]`，再沿时间轴分别执行 min/max，得到 `[8]`。相应的 `action` 和 `proprio` 有效性掩码的 `shape` 分别为 `[32]` 和 `[9]`。这是通用的两阶段包络，不是针对 state/action 的特殊实现开关。先计算 quantile 再执行 min/max，与先合并时间维再计算一次 quantile 并不等价；只有显式 post-reduction 才会移除 `observation` 时间轴。
 
 ## 固定版本、覆盖范围与身份
 
@@ -61,7 +61,7 @@ from remote_loader.exceptions import (
     StatisticsTimeoutError,
 )
 
-spec = StatisticsSpec.from_yaml("examples/libero_statistics.yaml")
+spec = StatisticsSpec.from_yaml("statistics.yaml")
 with StatisticsClient.from_config() as client:
     job = client.submit(spec, idempotency_key="libero-normalization-run-001")
     print(client.endpoint, job["job_id"])
@@ -117,12 +117,12 @@ with StatisticsClient(
 
 ```bash
 remote-loader statistics catalog
-remote-loader statistics submit examples/libero_statistics.yaml
+remote-loader statistics submit statistics.yaml
 remote-loader statistics status JOB_ID --control-endpoint CONTROL_ENDPOINT
 remote-loader statistics result JOB_ID --control-endpoint CONTROL_ENDPOINT --output ./libero-statistics.json
 remote-loader statistics cancel JOB_ID --control-endpoint CONTROL_ENDPOINT
 
-remote-loader statistics submit examples/libero_statistics.yaml \
+remote-loader statistics submit statistics.yaml \
   --wait --timeout 3600 --output ./libero-statistics.json \
   --idempotency-key libero-normalization-run-001
 ```

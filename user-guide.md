@@ -2,7 +2,9 @@
 
 训练代码主要使用 `RemoteDataLoader` 读取 VLA 单样本或 VQA batch；需要查看或调整请求时，再使用 `BatchSpec`。
 
-本文假定已在训练环境安装 client 和匹配的 PyTorch，完成连接、Token 与训练登记，并在各训练机器确认本机节点就绪。公开仓库和包不含证书、私钥或 Token；先通过私有渠道取得有效凭据，用 `remote-loader config edit` 配置实际 Scheduler 和全部三项绝对 TLS 文件路径，再使用 TUI/SDK。完整准备步骤见 [README](README.md)。示例中的 YAML 来自源码仓库或单独交付文件，不包含在 wheel 中；路径与源字段须按实际数据集确认。
+本文假定已在训练环境安装 client 和匹配的 PyTorch，完成连接、Token 与训练登记，并在各训练机器确认本机节点就绪。公开仓库和包不含证书、私钥或 Token；先通过私有渠道取得有效凭据，用 `remote-loader config edit` 配置实际 Scheduler 和全部三项绝对 TLS 文件路径，再使用 TUI/SDK。完整准备步骤见 [README](README.md)。
+
+本文中的 `batch.yaml` 指用户自行创建或通过私有渠道取得的配置文件；仓库和 wheel 均不提供示例 YAML。请按 [BatchSpec 字段参考](skill/modalink-client/references/batch-spec.md)、实际数据集能力和模型输入要求准备配置，并将代码中的路径替换为实际文件路径。
 
 | 操作 | 接口 |
 | --- | --- |
@@ -27,7 +29,7 @@ with RemoteDataLoader.from_yaml("batch.yaml") as loader:
 
 VLA 每次返回一个完整样本，不自动组训练 batch。返回的 key、嵌套结构、shape 和 dtype 由请求与实际数据决定；不要把时间维或 JSON 列表长度当作 batch 维，也不要无条件取 `[0]` 或 squeeze。
 
-[batch.yaml](batch.yaml) 是有源能力要求的模板，不保证任意数据集提供其中的相机、task 或 mask。模型所需的任务、机器人配置、频率和掩码必须来自真实数据或训练配置，不能用占位值绕过缺失字段。
+用户配置中的相机、task 或 mask 必须由实际数据集提供。模型所需的任务、机器人配置、频率和掩码必须来自真实数据或训练配置，不能用占位值绕过缺失字段。
 
 ### 持续读取
 
@@ -113,13 +115,7 @@ with RemoteDataLoader.from_yaml("vqa.yaml") as loader:
 
 ### 混合读取 VLA 和 VQA
 
-同时配置 VLA、VQA 数据集并开启服务后，可在源码仓库根目录运行[混合读取示例](examples/mixed_remote_batches.py)：
-
-```bash
-python examples/mixed_remote_batches.py --vla-batch-size 8 --vqa-batch-size 32 --batches 100 --seed 42
-```
-
-每次以 80% 的概率返回一组本地收集的 VLA samples，或以 20% 的概率返回一个完整 VQA batch。比例和 `--batches` 均按输出组计数；`--seed` 只控制组类型选择，不控制数据集采样。该示例演示读取，不代替模型所需的预处理与组批。
+同时配置 VLA、VQA 数据集并开启服务后，训练项目可分别使用上文的 VLA 与 VQA 接口读取数据，并自行决定混合比例。VLA 返回单样本，需要时在本地组批；VQA 已返回完整 batch，不应再次组批。混合策略、模型所需的预处理和输入适配由训练项目负责。
 
 ## 3. 修改 canonical v2 声明：按需使用
 
@@ -182,16 +178,7 @@ fields:
     tensor: {shape: [1, 3, 448, 224], dtype: float32}
 ```
 
-完整示例：
-
-- [libero_canonical.yaml](examples/libero_canonical.yaml)：原尺寸 uint8。
-- [libero_image_output.yaml](examples/libero_image_output.yaml)：两路相机的 256×320 float32 输出，mean/std 为 0.5；不是通用 LIBERO 训练配方。
-- [g05.yaml](g05.yaml)：G05 LIBERO 输入，要求 20 FPS、9 帧观测窗口和 32 帧动作窗口。
-- [pi05.yaml](pi05.yaml)：PI0.5 LIBERO 输入，要求 20 FPS、当前帧观测和 50 帧动作窗口；服务完成 224×224 non-antialias resize，SDK 交付逻辑 float32 图像。
-
-这些配置只声明 client 输出。使用前核对实际数据集的字段、shape、帧率和图像范围；模型所需的归一化、提示词处理及 loss masking 按训练项目要求执行。PI0.5 的 224×224 resize 已由服务完成，训练侧不要重复；训练前还需确认数据集提供所需归一化统计，并确认 loss 使用 `action_is_pad` 过滤 padding action。
-
-若使用 [libero_canonical.py](examples/libero_canonical.py) helper 读取并保存样本，必须显式传入当前用户可写、尚不存在的输出文件，例如 `python examples/libero_canonical.py --output "$HOME/modalink-samples/libero_sample_100.pt"`。该 helper 会实际读取数据，应先完成凭据、训练登记及 rank 配置；不要依赖默认 `/output` 目录可写。
+配置只声明 client 输出，不是通用模型训练配方。请依据 [BatchSpec 字段参考](skill/modalink-client/references/batch-spec.md) 自行配置，使用前核对实际数据集的字段、shape、帧率和图像范围，并按模型要求设置观测与动作窗口。模型所需的归一化、提示词处理及 loss masking 按训练项目要求执行；训练前确认数据集提供所需归一化统计，并按模型要求使用 `action_is_pad` 过滤 padding action。
 
 **不要在训练端重复已配置的 resize、图像 padding、`/255` 或 mean/std 标准化。** 对声明为 `float32` 的相机，SDK 派生独立的 `uint8` 服务请求，保留 resize、antialias、padding 和目标尺寸，服务端不执行 mean/std；浮点 resize 的结果在传输前量化为 uint8，因此不保证与旧的全浮点路径逐位一致。接收、预取及共享内存 IPC 均保留 uint8；DataLoader worker 在用户 preprocess/collate 之前恢复 float32、除以 255 并应用 YAML mean/std。直接迭代或 `num_workers=0` 时在调用线程恢复。显式 `uint8` 请求保持原样，不除以 255、不归一化；state/action 等非图像值不变。公开 spec 和 checkpoint 仍绑定原始 dtype、mean/std，wire schema 和 dtype 校验保持严格，协议仍为 HC v1。 其他模型专用 crop、动作维度 padding、动作转换或提示词处理按实际要求执行一次。修改图像配置后创建新的 loader，并确认返回的 shape、dtype 和数值范围符合模型要求。
 
@@ -304,7 +291,7 @@ if __name__ == "__main__":
     main()
 ```
 
-需要模型专用 CPU 处理时，向 `RemoteIterableDataset(remote, preprocess=...)` 传入模块顶层 callable；`collate_fn` 仍传给原生 DataLoader。完整命令行示例见 [examples/pytorch_multiworker.py](examples/pytorch_multiworker.py)。使用 helper 时同样可以传 `num_workers=8, prefetch_factor=2, multiprocessing_context="spawn"`。
+需要模型专用 CPU 处理时，向 `RemoteIterableDataset(remote, preprocess=...)` 传入模块顶层 callable；`collate_fn` 仍传给原生 DataLoader。使用 helper 时同样可以传 `num_workers=8, prefetch_factor=2, multiprocessing_context="spawn"`。
 
 - 网络接收、buffer、统计和读取位置留在创建 loader 的进程；worker 不继承或序列化这些对象用于取样，也不另建远端会话。SDK 不创建 CPU 处理进程池。
 - worker 经各自独立、带随机密钥认证的 loopback IPC 连接取样；创建进程仅串行取出 sample，传输编码与复制不持有取样锁，CPU 处理与组批仍在原生 worker 中进行。控制通道使用 pickle 传递有大小上限的元数据与描述符，不再用 pickle 搬运 CPU tensor 存储。网络 JSON 限额保持不变；本地 pickle 预算根据该限额及 tensor 数量、维数另行推导编码开销，由写端、读端和控制帧统一采用，不把两种编码的字节数直接等同，也不增加用户配置项。

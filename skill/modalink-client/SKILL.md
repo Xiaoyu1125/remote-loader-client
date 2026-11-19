@@ -22,7 +22,7 @@ description: Use when installing or configuring Modalink client, inspecting VLA 
 
 ## 配置并读取数据
 
-1. 核对训练 Python、安装包和 YAML，按安装说明检查实际使用的 SDK 与 PyTorch。离线检查 YAML 不需要 Token 或服务地址。
+1. 核对训练 Python、安装包和用户自行编写或通过私有渠道取得的 YAML，按安装说明检查实际使用的 SDK 与 PyTorch。公开仓库和 wheel 不提供 batch 或 statistics 请求 YAML；文档中的文件名仅表示用户提供的输入路径。离线检查 YAML 不需要 Token 或服务地址。
 2. 核对实际 Scheduler、完整的三项绝对 TLS 路径和已保存 Token，并确认服务支持经过处理的 uint8 相机请求（仅支持 HC1 不够）。火山 CEN 尚未接通时，客户按网络指南完成 VPC 授权，Modalink 完成服务侧接入，再检查双方网段、路由和访问控制。不要输出凭证内容。
 3. 在 TUI“启动训练”中设置 `training_id`、`num_nodes`、`gpus_per_node` 和数据集；需要 VQA 时同时配置 VQA 数据集。数据集版本和权重按实际训练填写。各机器使用一致的训练配置，`WORLD_SIZE` 等于 `num_nodes * gpus_per_node`。
 4. 选择“开启服务”并确认。编辑会立即保存，取消开启不撤销已保存设置。TUI 只确认本机 GPU 就绪，其他机器需各自检查。CLI 自动化使用 `training register` 和 `training status`，具体步骤见安装说明；登记数据服务不会启动模型训练。
@@ -34,7 +34,7 @@ description: Use when installing or configuring Modalink client, inspecting VLA 
 - VLA 每次读取一个 sample；当前 YAML 使用 `batch_format: {type: canonical_sample, version: 2}`，通过 `fields` 和 `windows` 声明字段与时间窗口。数据集在训练配置中选择，训练 batch size 在训练代码中设置。
 - `target` 定义输出路径，`tensor.shape` 是不含 batch 维的单样本形状；标量为 `[]`，单步时间维也保留。字段和任务、掩码应来自真实数据或支持的派生声明，不填占位值来绕过缺失数据。
 - `image_output` 默认开启，图像声明为目标尺寸的 `float32`；`antialias` 默认 `true`，float32 路径可设置 `false` 以匹配 PyTorch/ATen non-antialias bilinear；保留原尺寸 `uint8` 时设置 `image_output: {enabled: false}`。模型代码不要重复已配置的 resize、`/255` 或 mean/std 标准化。
-- 源码仓库提供通用 LIBERO 示例，以及根目录的 `g05.yaml` 和 `pi05.yaml`。G05/PI0.5 配置使用前须核对数据字段、shape、帧率、图像范围和训练项目要求；`pi05.yaml` 的 224×224 non-antialias resize 由服务完成，SDK 恢复逻辑 float32 图像，训练侧不要重复 resize。PI0.5 还需确认归一化统计和 `action_is_pad` loss masking 已准备。
+- 用户的模型配置使用前须核对数据字段、shape、帧率、图像范围和训练项目要求，并准备模型所需的归一化统计和 `action_is_pad` loss masking。已配置的 resize 由服务完成，SDK 恢复逻辑 float32 图像，训练侧不要重复 resize。
 - float32 相机 YAML 保持原声明；SDK 派生保留 resize/antialias/padding 的 uint8 请求，接收、预取与 IPC 保持 uint8，在 DataLoader worker 的用户 preprocess/collate 前恢复 float32、`/255` 与 mean/std（直接迭代和 `num_workers=0` 在调用线程恢复）。显式 uint8 请求和非图像字段不变，不改变窗口、采样或模型工作负载。
 - `to_torch_dataloader()` 默认逐个返回样本。VLA 可通过正整数 `batch_size` 本地组批；`preprocess`、`collate_fn` 按模型需要选用，未指定 `collate_fn` 时使用 PyTorch 默认组批。自定义 `collate_fn` 须同时设置正整数 `batch_size`。
 - helper 的 `num_workers=0` 默认在创建进程直接读取，不开启本地 IPC；正整数 worker 经本地认证 IPC 取样后运行 CPU preprocess/collate，创建进程仍独占接收 buffer，不另建远端 session，也不按 worker ID 再次分片。推荐 `spawn` 和模块顶层 callback；IPC 有复制成本，提前退出与每 worker 尾批遵循原生 IterableDataset 语义。helper 自动跟踪迭代器，正常结束或提前结束时调用 `remote_loader.pytorch.close_torch_dataloader(dataloader)`，然后退出 loader context。用户自行创建原生 DataLoader 时保存实际迭代器，关闭时传入 `iterator=iterator`。
@@ -44,7 +44,7 @@ description: Use when installing or configuring Modalink client, inspecting VLA 
 
 ## 附带脚本
 
-使用目标训练 Python 和实际交付路径：
+使用目标训练 Python；`SKILL_DIR` 指向源码中的 `skill/modalink-client` 或独立交付的 skill 目录，`BATCH_SPEC` 指向用户自行编写或通过私有渠道取得的 YAML 文件：
 
 ```bash
 # 离线检查，不连接服务

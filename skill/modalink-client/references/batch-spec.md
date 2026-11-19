@@ -1,6 +1,6 @@
 # 编写和修改 BatchSpec
 
-以实际交付的 YAML 为起点，先确认数据集的字段、形状、相机和模型要求。源码仓库提供 `batch.yaml`、`examples/`、[G05 配置](../../../g05.yaml)和 [PI0.5 配置](../../../pi05.yaml)；wheel 不含 YAML 或辅助脚本，独立交付时使用对应文件的实际路径。安装与数据集登记见 [deployment.md](deployment.md)，SDK 调用见 [api.md](api.md)。
+根据实际数据集的字段、形状、相机和模型要求自行编写 YAML，或使用通过私有渠道取得的配置。公开仓库和 wheel 均不提供 batch 请求 YAML；本文的 `batch.yaml` 表示用户提供的输入文件，请使用其实际路径。wheel 也不含辅助脚本。安装与数据集登记见 [deployment.md](deployment.md)，SDK 调用见 [api.md](api.md)。
 
 ## Canonical VLA 声明
 
@@ -104,7 +104,7 @@ fields:
 
 边框未标准化时为 0，标准化后各通道为 `(0 - mean[c]) / std[c]`。例如最终 shape `[1, 3, 448, 224]` 配合 `padding: [0, 0, 224, 0]`，内容为 224×224，顶部补 224 行；mean/std 均为 `[0.5, 0.5, 0.5]` 时顶部边框为 -1，首维仍为 T。
 
-通用例子见[原始 LIBERO YAML](../../../examples/libero_canonical.yaml)和 [float32 图像 LIBERO YAML](../../../examples/libero_image_output.yaml)。模型配置见 [G05 YAML](../../../g05.yaml)和 [PI0.5 YAML](../../../pi05.yaml)。所有尺寸、窗口和归一化参数都必须与实际数据及训练项目一致；PI0.5 YAML 的 224×224 non-antialias resize 由服务完成，SDK 恢复逻辑 float32 图像，训练侧不要重复 resize；归一化统计和 `action_is_pad` loss masking 仍须准备。**训练代码不要重复执行已经配置的 resize、图像 padding、像素缩放或标准化。**
+所有尺寸、窗口和归一化参数都必须与实际数据及训练项目一致。例如，用户声明 224×224 non-antialias resize 时，由服务完成 resize，SDK 恢复逻辑 float32 图像；模型所需的归一化统计和 `action_is_pad` loss masking 仍须准备。**训练代码不要重复执行已经配置的 resize、图像 padding、像素缩放或标准化。**
 
 float32 相机声明保持不变：SDK 派生经过处理的 uint8 请求，接收、预取与 IPC 保持 uint8，在 DataLoader worker 的用户 preprocess/collate 前恢复 float32、`/255` 和 mean/std；直接迭代及 `num_workers=0` 在调用线程恢复。显式 uint8 请求不变，训练窗口和采样语义不变。服务端必须支持此类经过处理的 uint8 相机请求；仅支持 HC v1（HC1）传输不足以保证兼容，须向服务方确认。
 

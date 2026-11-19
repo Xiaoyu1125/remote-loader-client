@@ -66,14 +66,10 @@ packages = ["src/remote_loader"]
 [tool.hatch.build.targets.sdist]
 only-include = [
   "src/remote_loader",
-  "examples",
   "skill/modalink-client",
   "README.md",
   "user-guide.md",
   "LICENSE.modaloader",
   "pyproject.toml",
-  "batch.yaml",
-  "g05.yaml",
-  "pi05.yaml",
   ".gitignore",
 ]

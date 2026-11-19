@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         "--spec",
         type=Path,
         default=Path("batch.yaml"),
-        help="delivered BatchSpec YAML (default: batch.yaml in the current directory)",
+        help="user-supplied BatchSpec YAML (default: batch.yaml in the current directory)",
     )
     parser.add_argument(
         "--receive",

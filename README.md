@@ -137,16 +137,13 @@ remote-loader diagnose connection
 
 数据集 ID、版本和权重在训练登记中选择；YAML 描述需要读取的字段和输出格式。完整字段参考见 [BatchSpec](skill/modalink-client/references/batch-spec.md)，SDK 用法见[用户接口文档](user-guide.md)。
 
+本文中的 `batch.yaml` 指用户自行创建或通过私有渠道取得的配置文件；仓库和 wheel 均不提供示例 YAML。请依据上述字段参考、实际数据集能力和模型输入要求准备配置，并将代码中的路径替换为实际文件路径。
+
 ### canonical v2 与图像输出
 
-VLA 使用 `batch_format: {type: canonical_sample, version: 2}`，通过 `fields`、`windows` 等声明单样本；tensor 的 shape 不含 batch 维。根目录 [batch.yaml](batch.yaml) 是有源字段要求的模板，不保证任意数据集都提供其中的 task、mask 和相机列。
+VLA 使用 `batch_format: {type: canonical_sample, version: 2}`，通过 `fields`、`windows` 等声明单样本；tensor 的 shape 不含 batch 维。配置中的 task、mask 和相机列必须由实际数据集提供，不能假定任意数据集都具备这些字段。
 
-按模型需要选择配置：
-
-- [原尺寸 uint8 示例](examples/libero_canonical.yaml)：显式设置 `image_output: {enabled: false}`。
-- [float32 图像示例](examples/libero_image_output.yaml)：启用图像处理，目标为 256×320，并设置 mean/std；这些是示例值，不是通用模型配方。
-- [G05 LIBERO 配置](g05.yaml)：要求 20 FPS 数据、9 帧观测窗口和 32 帧动作窗口；归一化、尺寸调整等模型处理按训练项目要求执行。
-- [PI0.5 LIBERO 配置](pi05.yaml)：要求 20 FPS 数据、当前帧观测和 50 帧动作窗口；服务执行 224×224 PyTorch/ATen non-antialias bilinear resize，SDK 恢复逻辑 float32 图像。训练前确认数据集提供所需归一化统计，并确认训练 loss 使用 `action_is_pad` 过滤 padding action。
+按模型要求设置观测与动作窗口、帧率、图像尺寸及归一化。需要原尺寸 uint8 时显式设置 `image_output: {enabled: false}`；需要处理后的 float32 图像时，按模型设置目标尺寸和 mean/std。训练前确认数据集提供所需归一化统计，并按模型要求使用 `action_is_pad` 过滤 padding action。
 
 图像处理默认开启，`image_output.antialias` 默认 `true`；float32 路径可设置 `false` 以匹配 PyTorch/ATen non-antialias bilinear。图像 `tensor.shape` 是含补边的最终画布尺寸。完整 dtype、padding、归一化和 hash 规则见[用户接口文档](user-guide.md)。**不要在训练端重复已配置的 resize、padding、`/255` 或 mean/std 标准化。** YAML 中相机的 `float32` 是逻辑输出：SDK 依据节点 metadata 的 `camera_keys` 派生 uint8 wire 请求，接收、预取和共享内存 IPC 保持 uint8，在 DataLoader worker 的用户 preprocess/collate 之前恢复 float32、`/255` 和 mean/std（直接迭代及 `num_workers=0` 在调用线程恢复）。服务保留原 resize/antialias/padding，浮点 resize 后量化为 uint8；显式 uint8 请求及非图像字段不变。公开 spec/checkpoint 保留原 dtype 与归一化，传输仍严格使用 HC v1。
 
@@ -168,7 +165,7 @@ with RemoteDataLoader.from_yaml("batch.yaml") as loader:
 
 可以直接使用返回数据；模型需要额外处理或本地组批时，再选用 `to_torch_dataloader()`。`preprocess` 和 `collate_fn` 均可选，具体用法与限制见[用户接口文档](user-guide.md)。
 
-`to_torch_dataloader()` 支持原生 PyTorch 的 `num_workers`、`prefetch_factor` 和 `persistent_workers` 参数，并自动跟踪创建的迭代器。`num_workers=0` 默认在创建进程直接读取，不开启本地 IPC；正整数 worker 通过认证 loopback 控制通道与各连接独占的可复用共享内存槽取样，并执行 CPU preprocess/collate，远端连接和接收 buffer 仍由每个训练 rank 的创建进程独占。正常结束或提前结束时，先停止迭代，再在退出 loader context 前调用 `remote_loader.pytorch.close_torch_dataloader(dataloader)`；仅当后续仍要使用同一个 `RemoteDataLoader` 时传 `close_source=False`。调用后该 PyTorch DataLoader 不可继续使用。手工创建原生 DataLoader 时，关闭函数需传入 `iterator=iterator`，用法见[用户接口文档](user-guide.md)及 [pytorch_multiworker.py](examples/pytorch_multiworker.py)。控制通道仅传元数据与确认消息；CPU tensor 存储经共享槽复制到 worker 私有内存后才进入 preprocess/collate。仍有存储复制、元数据序列化及原生组批开销，不保证 GPU overlap 或固定加速比例。
+`to_torch_dataloader()` 支持原生 PyTorch 的 `num_workers`、`prefetch_factor` 和 `persistent_workers` 参数，并自动跟踪创建的迭代器。`num_workers=0` 默认在创建进程直接读取，不开启本地 IPC；正整数 worker 通过认证 loopback 控制通道与各连接独占的可复用共享内存槽取样，并执行 CPU preprocess/collate，远端连接和接收 buffer 仍由每个训练 rank 的创建进程独占。正常结束或提前结束时，先停止迭代，再在退出 loader context 前调用 `remote_loader.pytorch.close_torch_dataloader(dataloader)`；仅当后续仍要使用同一个 `RemoteDataLoader` 时传 `close_source=False`。调用后该 PyTorch DataLoader 不可继续使用。手工创建原生 DataLoader 时，关闭函数需传入 `iterator=iterator`，用法见[用户接口文档](user-guide.md)。控制通道仅传元数据与确认消息；CPU tensor 存储经共享槽复制到 worker 私有内存后才进入 preprocess/collate。仍有存储复制、元数据序列化及原生组批开销，不保证 GPU overlap 或固定加速比例。
 
 ### VQA：读取完整 batch
 

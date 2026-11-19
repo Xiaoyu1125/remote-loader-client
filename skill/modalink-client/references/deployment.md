@@ -7,7 +7,7 @@
 | 项目 | 需要确认的内容 |
 | --- | --- |
 | 安装包与文档 | 公开仓库 `main` 分支源码及同一快照内的文档 |
-| 数据请求 | 实际 batch YAML 路径、可用的数据集 ID/version 和字段；YAML 与辅助脚本可独立交付 |
+| 数据请求 | 用户自行编写或通过私有渠道取得的 batch YAML 路径、可用的数据集 ID/version 和字段；公开仓库和 wheel 不提供请求 YAML |
 | 运行环境 | Python 3.10 或以上的实际训练环境，以及已有 PyTorch/CUDA |
 | Scheduler | 服务方确认的实际 URL/TLS 设置、本次 training_id、num_nodes、gpus_per_node |
 | 节点网络 | 节点 control HTTPS 端口、数据 TLS 端口及放行范围 |
@@ -44,7 +44,7 @@ python -c "import importlib.metadata as m; import remote_loader; print(m.version
 python -m remote_loader.cli.main diagnose environment
 ~~~
 
-源码目录不等于已安装的包；更新安装后重启仍使用旧版本的训练进程。下文 `remote-loader` 应来自同一训练环境，不能确认时统一改用 `python -m remote_loader.cli.main`。运行时 wheel 不包含 YAML 或辅助脚本：`SKILL_DIR` 指向源码仓库中的 `skill/modalink-client` 或独立交付的 skill 目录，`BATCH_SPEC` 指向实际 YAML。
+源码目录不等于已安装的包；更新安装后重启仍使用旧版本的训练进程。下文 `remote-loader` 应来自同一训练环境，不能确认时统一改用 `python -m remote_loader.cli.main`。公开仓库和 wheel 不提供 batch 或 statistics 请求 YAML，运行时 wheel 也不包含辅助脚本：`SKILL_DIR` 指向源码仓库中的 `skill/modalink-client` 或独立交付的 skill 目录，`BATCH_SPEC` 指向用户自行编写或通过私有渠道取得的 YAML。
 
 ## 3. 配置私有凭据与实际服务
 

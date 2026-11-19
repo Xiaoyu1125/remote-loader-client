@@ -1,6 +1,6 @@
 # 用户接入文档与数据读取
 
-本页是常用调用与数据检查索引；完整训练用法见 [用户指南](../../../user-guide.md)，YAML 参数见 [batch-spec.md](batch-spec.md)。示例中的 `batch.yaml` 替换为实际交付文件路径。wheel 不含 YAML 或辅助脚本；安装、连接、登记和释放资源统一见 [deployment.md](deployment.md)。
+本页是常用调用与数据检查索引；完整训练用法见 [用户指南](../../../user-guide.md)，YAML 参数见 [batch-spec.md](batch-spec.md)。示例中的 `batch.yaml` 是用户自行编写或通过私有渠道取得的输入文件，请替换为实际路径；公开仓库和 wheel 均不提供 batch 请求 YAML。wheel 也不含辅助脚本；安装、连接、登记和释放资源统一见 [deployment.md](deployment.md)。
 
 公开仓库和包不含证书、私钥或 Token。连接前按部署指南通过私有渠道取得有效凭据，用 `remote-loader config edit` 配置实际 Scheduler 及 Loader CA、客户端证书、客户端私钥的全部三项绝对路径，再保存 Modalink Token；SDK 沿用该配置。float32 相机需要服务支持经过处理的 uint8 请求，仅支持 HC1 不足以保证兼容；worker 在用户 preprocess/collate 前恢复 float32，显式 uint8 请求保持原样。
 
@@ -52,7 +52,7 @@ VLA 每次返回一个样本，保留声明的键、嵌套路径、shape 和 dty
 
 `loader.dataset_metadata` 启动前为 `{}`，启动后为 `{control_endpoint: 元信息字典}`，单节点也不展平。按节点保留上下文并处理缺失键；它不保证每个样本含同一套任务或模型信息。
 
-使用独立交付的检查脚本时，`SKILL_DIR` 指向 skill 目录，`BATCH_SPEC` 指向 YAML：
+使用源码中或独立交付的检查脚本时，`SKILL_DIR` 指向 skill 目录，`BATCH_SPEC` 指向用户提供的 YAML：
 
 ```bash
 python "$SKILL_DIR/scripts/inspect_batch.py" --spec "$BATCH_SPEC" --receive --items 1

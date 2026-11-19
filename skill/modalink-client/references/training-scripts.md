@@ -6,7 +6,7 @@
 
 先确认资源操作授权、实际 scheduler、TLS 设置、本次唯一的 training_id、节点数、每节点 GPU 数及数据集版本。公开仓库和包不含证书、私钥或 Token；须通过私有渠道取得有效凭据，按 [deployment.md](deployment.md) 用 `remote-loader config edit` 保存实际 Scheduler 及全部三项绝对 TLS 路径，再保存 Modalink Token，之后才能使用 TUI/SDK 或这些脚本。自动云发现不提供凭据。文档和脚本模板本身不构成执行登记或释放的授权。所有训练主机使用一致的训练参数和连接设置；独立配置通过 `REMOTE_LOADER_CONFIG` 指定，脚本与训练进程使用同一配置。`PYTHON` 指实际训练环境的解释器。
 
-下面是可保存为 `training-request.json` 的完整训练配置示例：两台主机、每台四个 GPU，整个训练的 `WORLD_SIZE=8`。替换 ID、版本和资源数量后使用，不要把 batch YAML 作为登记文件。
+下面是可保存为 `training-request.json` 的完整训练配置示例：两台主机、每台四个 GPU，整个训练的 `WORLD_SIZE=8`。替换 ID、版本和资源数量后使用，不要把 batch YAML 作为登记文件。数据读取所需的 batch YAML 由用户自行编写或通过私有渠道取得，公开仓库和 wheel 均不提供该输入文件。
 
 ~~~json
 {
